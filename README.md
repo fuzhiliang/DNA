@@ -4,3 +4,7 @@ git init
 git add README.md
 git commit -m "DAN commit"
 git status
+git push origin master
+git branch my-branch
+git checkout my-granch 
+
