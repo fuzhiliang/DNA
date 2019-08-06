@@ -1,0 +1,1 @@
+/home/fuzl/script/shell.sh
