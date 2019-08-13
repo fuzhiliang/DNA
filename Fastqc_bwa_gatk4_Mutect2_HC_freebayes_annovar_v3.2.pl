@@ -145,7 +145,6 @@ $cmd .="$bwa mem -M -t $threads -R '\@RG\\tID:$sample\\tSM:$sample\\tLB:$sample\
 ################################
 $cmd ="";
 $cmd .="$GATK --java-options '-Xmx${vf}G -Djava.io.tmpdir=./'  SortSam -SO coordinate  -I $outdir/bwa/$sample.sam  -O $outdir/GATK/$sample.bam  1>$outdir/GATK/log.sort 2>&1\n";
-
 $cmd .="$samtools index $outdir/GATK/$sample.bam \n";
 &runcmd("3 GATK_1 SortSam",$cmd);
 
@@ -208,7 +207,7 @@ my $mean_coverageData=`grep "mean coverageData" ${bam}_QC/genome_results.txt |aw
 #my $On_target= `sed -n 173p  ${bam}_QC/qualimapReport.html|cut -d ">" -f 2|cut -d "<" -f 1|sed 's/\\s\\+\\/\\s\\+/ \\(/'|sed 's/\$/\\)/'`;chomp ($On_target);##qualimap 添加-sd参数，考虑dup
 my $On_target= `sed -n 176p  ${bam}_QC/qualimapReport.html|cut -d ">" -f 2|cut -d "<" -f 1|sed 's/\\s\\+\\/\\s\\+/ \\(/'|sed 's/\$/\\)/'`;chomp ($On_target);
 my $target=`grep -A 1  "Regions size/percentage of reference"  ${bam}_QC/qualimapReport.html|tail -n 1`; 
-$target=~m/(\d*(,\d*)?)\s\/\s(\d+.\d+\%)/;
+$target=~m/(\d*(,\d*)?)\s\/\s((\d+.)?\d+\%)/;
 #print "$1\t$3";die;
 my $target_length="$1($3)";
 my $length=$1;$length=~s/,//g;
@@ -235,7 +234,7 @@ $cmd ="";
 my $vcf="";
 &MKDIR("$outdir/vcf");
 
-$gatktype||=4;
+$gatktype||=2;
 if ($gatktype == "2"){
 	$cmd .="$GATK  --java-options '-Xmx${vf}G -Djava.io.tmpdir=./'   Mutect2  -R $genome -I $bam ";
 	#$cmd .=" --dbsnp $dbSNP "; 
@@ -252,11 +251,37 @@ if ($gatktype == "2"){
 #	&filter($vcf,$outdir) ;
 #	$vcf="$outdir/vcf/${sample}.filter.PASS.vcf ";
 }elsif($gatktype == "4"){
-	$freebayes="$freebayesp  $threads_bayes	$freebayes ";
-	$cmd .="$freebayes -j -m 10 -q 30 -F 0.001 -C 1 -t $bed -i --no-indels -f $genome $bam > $outdir/vcf/$sample.snp.freebayesp_q30.vcf \n";
-	$cmd .="$freebayes -j -m 10 -q 20 -F 0.001 -C 1 -t $bed -I  -f $genome $bam > $outdir/vcf/$sample.freebayesp_q20.vcf \n";
+	#$freebayes="$freebayesp  $threads_bayes	$freebayes ";
+	system "rm $outdir/temp_bed/*bed" if (-d "$outdir/temp_bed");
+	&MKDIR("$outdir/temp_bed");
+	$threads_bayes=($threads_bayes>10?10:$threads_bayes); #默认最多拆10份
+	my $bedtools=$detail_cfg{bedtools};
+	#$cmd.="$bedtools  split -i $bed -n $threads_bayes -p $outdir/temp_bed/a ";
+	`$bedtools  split -i $bed -n $threads_bayes -p $outdir/temp_bed/a `;
+	$cmd="";
+	my @bed=glob("$outdir/temp_bed/a*.bed");
+	my @finish=glob("$outdir/temp_bed/*finish");
+	print "finish number is: $#finish\nbed number is: $#bed\n";
+	system "rm $outdir/shell/5.0_freebayes_split.sh.finish " if ($#finish!=$#bed);
+	foreach my $bed(@bed){
+		$cmd .="$bedtools sort -i $bed >$bed.m && mv $bed.m $bed \n";
+		$cmd .="$freebayes -j -m 10 -q 30 -F 0.001 -C 1 -t $bed -i --no-indels -f $genome $bam > $bed.snp.freebayesp_q30.vcf && ";
+		$cmd .="$freebayes -j -m 10 -q 20 -F 0.001 -C 1 -t $bed -I  -f $genome $bam > $bed.indel.freebayesp_q20.vcf && touch \"$bed.finish\" || touch \"$bed.error\" &\n";
+	}
+	&runsh("5.0 freebayes split",$cmd,"$outdir/temp_bed/");
+	my @error;
+	until($#finish==$#bed) {
+		@finish=glob("$outdir/temp_bed/*finish");
+		@error=glob("$outdir/temp_bed/*.error");
+		exit(1) if ($#error>=0);
+		sleep 2;
+	}
+   	system "touch $outdir/shell/5.0_freebayes_split.sh.finish ";
 
-	$cmd .="cat $outdir/vcf/$sample.snp.freebayesp_q30.vcf $outdir/vcf/$sample.freebayesp_q20.vcf  >$outdir/vcf/$sample.vcf \n";
+	print "split bed done.\n";
+	$cmd ="cat $outdir/temp_bed/*.snp.freebayesp_q30.vcf|grep -v \"#\" |sort >$outdir/vcf/$sample.snp.freebayesp_q30.vcf \n";
+	$cmd .="cat $outdir/temp_bed/*.indel.freebayesp_q20.vcf|grep -v \"#\" |sort >$outdir/vcf/$sample.indel.freebayesp_q20.vcf \n";
+	$cmd .="cat $outdir/vcf/$sample.snp.freebayesp_q30.vcf $outdir/vcf/$sample.indel.freebayesp_q20.vcf  >$outdir/vcf/$sample.vcf \n";
 	$cmd .= "perl $annovar/table_annovar.pl $outdir/vcf/$sample.vcf  $humandb -buildver hg19 "; 
 	$cmd .= "-out  $outdir/vcf/${sample}  -remove -protocol refGene,cytoBand,dbnsfp30a,cosmic83,snp144,1000g2015aug_all,1000g2015aug_afr,1000g2015aug_amr,1000g2015aug_eas,1000g2015aug_eur,1000g2015aug_sas,clinvar_20170905,esp6500siv2_all ";
 	$cmd .= "-operation g,r,f,f,f,f,f,f,f,f,f,f,f --buildver hg19 --nastring . --vcfinput --otherinfo --dot2underline >$outdir/vcf/annovar.log \n";
@@ -292,9 +317,9 @@ $cmd.="rm -r $outdir/fusion_SE/tmp $outdir/fusion_SE/Deal  \n";
 &runcmd("7.0 Fusion_cmd",$cmd)if ($fusion) ;
 
 $cmd="";
-$cmd .="$STAR_Fusion --genome_lib_dir $Fusion_database --left_fq $fq1 --right_fq $fq2 --output_dir $outdir/star_fusion --CPU $threads \n";
+$cmd .="$STAR_Fusion --genome_lib_dir $Fusion_database --left_fq $fq1 --right_fq $fq2 --output_dir $outdir/star_fusion --CPU $threads threads\n";
 #/home/fuzl/soft/Fusion/STAR-Fusion-v1.5.0/STAR-Fusion --genome_lib_dir /home/fuzl/soft/Fusion/GRCh37_v19_CTAT_lib_Feb092018/ctat_genome_lib_build_dir --left_fq /home/fuzl/project/demo/lib-HD-4_1.fq.gz --right_fq /home/fuzl/project/demo/lib-HD-4_2.fq.gz --output_dir /home/fuzl/project/demo/new_HD-4_star_fusion_outdir --CPU 36
-&runcmd("7.1 STAR Fusion",$cmd)if ($fusion);
+#&runcmd("7.1 STAR Fusion",$cmd)if ($fusion);
 
 `rm $outdir/bwa/$sample.sam ` if (-f "$outdir/bwa/$sample.sam");  
 ###############################################################################
@@ -403,6 +428,36 @@ sub runcmd { #
 		&log_current_time("$name result has been finish, no duplicate run.");
 	}
 }
+sub runsh { # 
+	my $name=shift @_;
+	my $cmd=shift @_;
+	my $temp=shift @_;
+	&MKDIR("$outdir/shell/");
+	my $start_time=time;
+	&log_current_time("Start $name analysis...\n");
+	my $n=$name;
+	$n=~s/\s+/_/g ;
+	my $log_file="$outdir/shell/$n.log";
+	open CMD ,">$outdir/shell/$n.sh" or die $!;
+	my $project_id=$detail_cfg{Project_id};
+	print CMD "$cmd";
+	close CMD;
+	unless (defined $onlyprintcmd || -f "$outdir/shell/$n.sh.finish"){
+		my $flag = system("sh $outdir/shell/$n.sh > $log_file  & ") ;
+	    if ($flag != 0 ){
+	        &log_current_time("Error: command failed: $cmd");
+	       	system "touch $outdir/shell/$n.sh.error";
+	        exit(1);
+	    } else {
+	        my $escaped_time = (time()-$start_time)."s";
+	        &log_current_time("$name done, escaped time: $escaped_time.\n");
+	       	system "rm $outdir/shell/$n.sh.error " if (-f "$outdir/shell/$n.sh.error");
+	       	system "touch $outdir/shell/$n.sh.finish ";
+	    }
+	}else{
+		&log_current_time("$name result has been finish, no duplicate run.");
+	}
+}
 
 sub MKDIR{
 	my $dir=shift @_;
@@ -443,3 +498,8 @@ sub filter{
 	return ($cmd);
 }
 
+sub split_bed{
+	my $bed=shift @_;
+	my $number=shift @_;
+
+}
