@@ -13,11 +13,11 @@ git checkout my-granch
 
 #################   
 
-perl ../DNA/Fastqc_bwa_gatk4_Mutect2_HC_freebayes_annovar_v3.2.pl  
+perl Fastqc_bwa_gatk4_Mutect2_HC_freebayes_annovar_v3.2.pl  
   
 Usage:  
         eg:  
-perl ../DNA/Fastqc_bwa_gatk4_Mutect2_HC_freebayes_annovar_v3.2.pl -fq1 /home/fuzl/project/demo/demo_1.fq -fq2 /home/fuzl/project/demo/demo_2.fq -outdir /home/fuzl/project/demo/GATK4demo -gatktype 1 -vf 10  
+perl Fastqc_bwa_gatk4_Mutect2_HC_freebayes_annovar_v3.2.pl -fq1 /home/fuzl/project/demo/demo_1.fq -fq2 /home/fuzl/project/demo/demo_2.fq -outdir /home/fuzl/project/demo/GATK4demo -gatktype 1 -vf 10  
 Function: Template for Perl FASTQC BWA GATK pipeline .  
 Command:  
         -fq1 str        fq1 fastq format *_1.fq or *_1.fq.gz  
