@@ -261,7 +261,7 @@ if ($gatktype == "2"){
 	$cmd="";
 	my @bed=glob("$outdir/temp_bed/a*.bed");
 	my @finish=glob("$outdir/temp_bed/*finish");
-	print "finish number is: $#finish\nbed number is: $#bed\n";
+	print "finish number is: $#finish+1\nbed number is: $#bed+1\n";
 	system "rm $outdir/shell/5.0_freebayes_split.sh.finish " if ($#finish!=$#bed);
 	foreach my $bed(@bed){
 		$cmd .="$bedtools sort -i $bed >$bed.m && mv $bed.m $bed \n";
@@ -312,7 +312,7 @@ $cmd .= "-operation g,r,f,f,f,f,f,f,f,f,f,f,f --buildver hg19 --nastring . --vcf
 my $SE=$detail_cfg{SE};
 #my $fusion_bed ||="$SE/database/fusion_38cf.bed ";
 my $fusion_bed=$detail_cfg{fusion_bed};
-$cmd="perl $SE/SEGF.pl -fq1 $fq1 -fq2 $fq2 -bed $fusion_bed -odir $outdir/fusion_SE -trim_len 10 -remain_len 35 -process  1>/dev/null 2>&1 \n";
+$cmd="perl $SE/SEGF.pl -fq1 $fq1 -fq2 $fq2 -bed $fusion_bed -odir $outdir/fusion_SE -trim_len 10 -remain_len 35 -process $threads  1>/dev/null 2>&1 \n";
 $cmd.="rm -r $outdir/fusion_SE/tmp $outdir/fusion_SE/Deal  \n";
 &runcmd("7.0 Fusion_cmd",$cmd)if ($fusion) ;
 
