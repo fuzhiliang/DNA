@@ -207,9 +207,9 @@ my $mean_coverageData=`grep "mean coverageData" ${bam}_QC/genome_results.txt |aw
 #my $On_target= `sed -n 173p  ${bam}_QC/qualimapReport.html|cut -d ">" -f 2|cut -d "<" -f 1|sed 's/\\s\\+\\/\\s\\+/ \\(/'|sed 's/\$/\\)/'`;chomp ($On_target);##qualimap 添加-sd参数，考虑dup
 my $On_target= `sed -n 176p  ${bam}_QC/qualimapReport.html|cut -d ">" -f 2|cut -d "<" -f 1|sed 's/\\s\\+\\/\\s\\+/ \\(/'|sed 's/\$/\\)/'`;chomp ($On_target);
 my $target=`grep -A 1  "Regions size/percentage of reference"  ${bam}_QC/qualimapReport.html|tail -n 1`; 
-$target=~m/(\d*(,\d*)?)\s\/\s((\d+.)?\d+\%)/;
+$target=~m/(\d*((,\d*)+)?)\s\/\s((\d+.)?\d+\%)/;
 #print "$1\t$3";die;
-my $target_length="$1($3)";
+my $target_length="$1($4)";
 my $length=$1;$length=~s/,//g;
 #my $target_bases=$length*$mean_coverageData;
 my $target_bases_freq=$Bases_target_mapped/$Bases_mapped*100;$target_bases_freq=sprintf("%0.2f",$target_bases_freq);
