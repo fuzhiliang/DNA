@@ -89,7 +89,6 @@ if (defined $bdir) {
 $outdir=~'s/\/$//';
 $outdir=abs_path($outdir);
 &MKDIR ($outdir);
-
 ########
 #my %step;
 #$step ||= ($step_by_step) ? '1' : join ',',(1..7);
@@ -148,19 +147,20 @@ $cmd .="$bwa mem -M -t $threads -R '\@RG\\tID:$sample\\tSM:$sample\\tLB:$sample\
 &runcmd("2 BWA",$cmd);
 
 ################################
+chdir "$outdir";
 $cmd ="";
 $cmd .="$GATK --java-options '-Xmx${vf}G -Djava.io.tmpdir=./'  SortSam -SO coordinate  -I $outdir/bwa/$sample.sam  -O $outdir/GATK/$sample.bam  1>$outdir/GATK/log.sort 2>&1\n";
 $cmd .="$samtools index $outdir/GATK/$sample.bam \n";
 &runcmd("3 GATK_1 SortSam",$cmd);
 my $bam;
 if ($uid){
-	#`awk 'NR==FNR{if (NR%4==1){a[$1]=\$NF}}NR>FNR{if (/^@/){print $0}else{if ("@"$1"/1" in a){print $0"\tID:Z:"a["@"$1"/1"]}}}' <(zcat $fq1 ) <(samtools view -h $outdir/GATK/$sample.bam) |awk  '{if(\$NF == CUST_ID ){$2+=1024;print $0 }else{if(\$NF != CUST_ID){CUST_ID=\$NF;print $0}}}' OFS="\t" |samtools view -Sb >$outdir/GATK/$sample.uid_make.bam && touch "3_GATK_2_UID_MarkDuplicates.sh.finish" ` unless (-f "3_GATK_2_UID_MarkDuplicates.sh.finish");
+	#`awk 'NR==FNR{if (NR%4==1){a[$1]=\$NF}}NR>FNR{if (/^@/){print $0}else{if ("@"$1"/1" in a){print $0"\tID:Z:"a["@"$1"/1"]}}}' <(zcat $fq1 ) <($samtools view -h $outdir/GATK/$sample.bam) |awk  '{if(\$NF == CUST_ID ){$2+=1024;print $0 }else{if(\$NF != CUST_ID){CUST_ID=\$NF;print $0}}}' OFS="\t" |$samtools view -Sb >$outdir/GATK/$sample.uid_make.bam && touch "3_GATK_2_UID_MarkDuplicates.sh.finish" ` unless (-f "3_GATK_2_UID_MarkDuplicates.sh.finish");
 	$cmd="gunzip -c $fq1>$outdir/GATK/$sample.1.fq \n";
-	$cmd .="samtools view -h $outdir/GATK/$sample.bam >$outdir/GATK/$sample.sam \n";
+	$cmd .="$samtools view -h $outdir/GATK/$sample.bam >$outdir/GATK/$sample.sam \n";
 	$cmd .=" awk \'NR==FNR\{if \(NR%4==1\)\{a[\$1]=\$NF\}\}NR>FNR\{if \(\/\^\@\/\)\{print \$0\}else\{if \(\"\@\"\$1\"\/1\" in a\){print \$0\"\\tID:Z:\"a[\"\@\"\$1\"\/1\"]\}\}\}\' $outdir/GATK/$sample.1.fq $outdir/GATK/$sample.sam ";
-	$cmd .="|awk  \'\{if\(\$NF == CUST_ID \)\{\$2+=1024;print \$0 \}else\{if\(\$NF != CUST_ID\)\{CUST_ID=\$NF;print \$0\}\}\}\' OFS=\"\\t\" |samtools view -Sb >$outdir/GATK/$sample.uid_make.sorted.bam \n ";
+	$cmd .="|awk  \'\{if\(\$NF == CUST_ID \)\{\$2+=1024;print \$0 \}else\{if\(\$NF != CUST_ID\)\{CUST_ID=\$NF;print \$0\}\}\}\' OFS=\"\\t\" |$samtools view -Sb >$outdir/GATK/$sample.uid_make.sorted.bam \n ";
 	$bam="$outdir/GATK/$sample.uid_make.sorted.bam ";
-	$cmd .="samtools index $bam \n";
+	$cmd .="$samtools index $bam \n";
 	$cmd .="rm $outdir/GATK/$sample.1.fq && rm $outdir/GATK/$sample.sam \n";
 	#`$cmd && touch "3_GATK_2_UID_MarkDuplicates.sh.finish" ` unless (-f "3_GATK_2_UID_MarkDuplicates.sh.finish");
 	&runcmd("3 GATK_2 UID_MarkDuplicates",$cmd);
